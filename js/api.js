@@ -98,7 +98,9 @@ async function fetchAlternatives(product) {
   // NOTE: category is pre-validated by the regex above to only contain [a-z0-9-] plus one
   // literal colon — do NOT encodeURIComponent it. OFF's edge routing rejects an encoded
   // ":" (%3A) in categories_tags with a CORS-less "Failed to fetch", while the raw colon works.
-  const url = `https://world.openfoodfacts.org/api/v2/search?categories_tags=${category}&fields=code,product_name,brands,image_front_small_url,nutriscore_grade&page_size=40`;
+  // sort_by=nutriscore_score gives deterministic best-graded-first ordering server-side,
+  // so a small page_size is enough (cheaper and less likely to hit anonymous rate limits).
+  const url = `https://world.openfoodfacts.org/api/v2/search?categories_tags=${category}&sort_by=nutriscore_score&fields=code,product_name,brands,image_front_small_url,nutriscore_grade&page_size=10`;
 
   let data;
   try {
@@ -109,7 +111,7 @@ async function fetchAlternatives(product) {
     return [];
   }
 
-  const products = data.products || [];
+  const products = Array.isArray(data.products) ? data.products : [];
   const rank = { a: 0, b: 1, c: 2, d: 3, e: 4 };
 
   return products
