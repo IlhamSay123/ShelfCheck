@@ -27,10 +27,6 @@
       <span class="brand-mark">🛒</span>
       <span class="brand-name">ShelfCheck</span>
     </div>
-    <nav class="tabs" role="tablist" aria-label="Sections">
-      <button class="tab-btn active" data-view="scanner" role="tab" aria-selected="true">Scan</button>
-      <button class="tab-btn" data-view="history" role="tab" aria-selected="false">History</button>
-    </nav>
   </header>
 
   <main class="views">
@@ -40,7 +36,6 @@
 
       <div class="scan-card">
         <div id="reader" class="reader"></div>
-        <div class="scan-frame" aria-hidden="true"></div>
         <div class="scan-controls">
           <button id="btn-start-scan" class="btn btn-primary btn-lg">
             <span class="icon">📷</span> Start Camera Scan
@@ -89,27 +84,38 @@
           </div>
         </div>
 
-        <div id="verdict-badge" class="verdict-badge">
-          <span id="verdict-emoji">❔</span>
-          <div>
+        <div id="warning-banner" class="warning-banner hidden">
+          <span class="warning-icon">⚠️</span>
+          <ul id="warning-list"></ul>
+        </div>
+
+        <div id="verdict-row" class="verdict-row">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 120 120" class="gauge-svg">
+              <circle class="gauge-track" cx="60" cy="60" r="52"></circle>
+              <circle id="gauge-fill-circle" class="gauge-fill-circle" cx="60" cy="60" r="52"></circle>
+            </svg>
+            <div class="gauge-center">
+              <span id="gauge-grade-text" class="gauge-grade-text">?</span>
+            </div>
+          </div>
+          <div class="verdict-info">
             <div id="verdict-label" class="verdict-label">Unknown</div>
             <div id="verdict-reason" class="verdict-reason"></div>
+            <div class="nova-chip">
+              <span>NOVA processing:</span>
+              <span id="nova-badge" class="nova-value">?</span>
+            </div>
           </div>
         </div>
 
-        <div class="grade-row">
-          <div class="grade-chip">
-            <span class="grade-chip-title">Nutri-Score</span>
-            <span id="nutriscore-badge" class="grade-letter">?</span>
-          </div>
-          <div class="grade-chip">
-            <span class="grade-chip-title">Processing (NOVA)</span>
-            <span id="nova-badge" class="grade-letter">?</span>
-          </div>
-        </div>
+        <section id="alternatives-section" class="alternatives hidden">
+          <h3 class="section-title">Healthier alternatives</h3>
+          <div id="alternatives-list" class="alt-scroll"></div>
+        </section>
 
         <h3 class="section-title">Per 100g</h3>
-        <div id="nutrient-lights" class="nutrient-lights"></div>
+        <div id="nutrient-lights" class="nutrient-bars"></div>
 
         <div id="ingredients-section" class="collapsible">
           <button class="collapsible-toggle" data-target="ingredients-body">Ingredients ▾</button>
@@ -132,9 +138,28 @@
           </div>
         </div>
 
-        <button id="btn-scan-again" class="btn btn-primary btn-lg full-width">Scan Another</button>
+        <div class="result-actions">
+          <button id="btn-log-this" class="btn btn-secondary btn-lg">📒 Log this</button>
+          <button id="btn-scan-again" class="btn btn-primary btn-lg">Scan Another</button>
+        </div>
       </section>
 
+    </section>
+
+    <!-- LOG VIEW -->
+    <section id="view-log" class="view">
+      <div class="log-header">
+        <button id="log-prev-day" class="btn btn-icon small">‹</button>
+        <h2 id="log-date-label">Today</h2>
+        <button id="log-next-day" class="btn btn-icon small">›</button>
+      </div>
+
+      <h3 class="section-title">Daily totals</h3>
+      <div id="log-totals" class="nutrient-bars"></div>
+
+      <h3 class="section-title">Logged items</h3>
+      <ul id="log-list" class="history-list"></ul>
+      <p id="log-empty" class="muted center hidden">Nothing logged for this day yet. Scan something and tap "Log this".</p>
     </section>
 
     <!-- HISTORY VIEW -->
@@ -147,7 +172,39 @@
       <p id="history-empty" class="muted center hidden">No scans yet. Scan a product to see it here.</p>
     </section>
 
+    <!-- PROFILE VIEW -->
+    <section id="view-profile" class="view">
+      <h2>Your Profile</h2>
+      <p class="muted small">Set your allergens, diet and nutrient limits — ShelfCheck flags conflicts on every scan.</p>
+
+      <h3 class="section-title">Allergens to avoid</h3>
+      <div id="profile-allergens" class="chip-grid"></div>
+
+      <h3 class="section-title">Diet</h3>
+      <div id="profile-diets" class="chip-grid"></div>
+
+      <h3 class="section-title">Personal nutrient limits (per 100g)</h3>
+      <div id="profile-limits" class="limits-grid"></div>
+
+      <p id="profile-saved-hint" class="muted small center hidden">Saved ✓</p>
+    </section>
+
   </main>
+
+  <nav class="bottom-nav" role="tablist" aria-label="Sections">
+    <button class="nav-btn active" data-view="scanner" role="tab" aria-selected="true">
+      <span class="nav-icon">📷</span><span class="nav-label">Scan</span>
+    </button>
+    <button class="nav-btn" data-view="log" role="tab" aria-selected="false">
+      <span class="nav-icon">📒</span><span class="nav-label">Log</span>
+    </button>
+    <button class="nav-btn" data-view="history" role="tab" aria-selected="false">
+      <span class="nav-icon">🕘</span><span class="nav-label">History</span>
+    </button>
+    <button class="nav-btn" data-view="profile" role="tab" aria-selected="false">
+      <span class="nav-icon">👤</span><span class="nav-label">Profile</span>
+    </button>
+  </nav>
 
   <div id="toast" class="toast hidden"></div>
 </div>
@@ -155,6 +212,8 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="js/api.js"></script>
 <script src="js/health.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/log.js"></script>
 <script src="js/scanner.js"></script>
 <script src="js/app.js"></script>
 </body>

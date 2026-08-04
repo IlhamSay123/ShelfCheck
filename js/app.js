@@ -2,12 +2,26 @@
 (function () {
   const HISTORY_KEY = "shelfcheck_history_v1";
   const MAX_HISTORY = 50;
+  const GAUGE_RADIUS = 52;
+  const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
+
+  const NUTRIENT_ITEMS = [
+    { key: "energyKcal", label: "Energy", unit: "kcal", colored: false },
+    { key: "fat", label: "Fat", unit: "g", colored: true },
+    { key: "saturatedFat", label: "Saturated Fat", unit: "g", colored: true },
+    { key: "sugars", label: "Sugars", unit: "g", colored: true },
+    { key: "salt", label: "Salt", unit: "g", colored: true },
+    { key: "fiber", label: "Fiber", unit: "g", colored: false },
+    { key: "proteins", label: "Protein", unit: "g", colored: false }
+  ];
 
   const els = {
-    tabBtns: document.querySelectorAll(".tab-btn"),
+    navBtns: document.querySelectorAll(".nav-btn"),
     views: {
       scanner: document.getElementById("view-scanner"),
-      history: document.getElementById("view-history")
+      log: document.getElementById("view-log"),
+      history: document.getElementById("view-history"),
+      profile: document.getElementById("view-profile")
     },
     btnStartScan: document.getElementById("btn-start-scan"),
     btnStopScan: document.getElementById("btn-stop-scan"),
@@ -25,12 +39,16 @@
     resultName: document.getElementById("result-name"),
     resultBrand: document.getElementById("result-brand"),
     resultQty: document.getElementById("result-qty"),
-    verdictBadge: document.getElementById("verdict-badge"),
-    verdictEmoji: document.getElementById("verdict-emoji"),
+    warningBanner: document.getElementById("warning-banner"),
+    warningList: document.getElementById("warning-list"),
+    verdictRow: document.getElementById("verdict-row"),
+    gaugeFillCircle: document.getElementById("gauge-fill-circle"),
+    gaugeGradeText: document.getElementById("gauge-grade-text"),
     verdictLabel: document.getElementById("verdict-label"),
     verdictReason: document.getElementById("verdict-reason"),
-    nutriscoreBadge: document.getElementById("nutriscore-badge"),
     novaBadge: document.getElementById("nova-badge"),
+    alternativesSection: document.getElementById("alternatives-section"),
+    alternativesList: document.getElementById("alternatives-list"),
     nutrientLights: document.getElementById("nutrient-lights"),
     ingredientsSection: document.getElementById("ingredients-section"),
     ingredientsText: document.getElementById("ingredients-text"),
@@ -39,22 +57,36 @@
     additivesSection: document.getElementById("additives-section"),
     additivesText: document.getElementById("additives-text"),
     btnScanAgain: document.getElementById("btn-scan-again"),
+    btnLogThis: document.getElementById("btn-log-this"),
     historyList: document.getElementById("history-list"),
     historyEmpty: document.getElementById("history-empty"),
     btnClearHistory: document.getElementById("btn-clear-history"),
+    logDateLabel: document.getElementById("log-date-label"),
+    logPrevDay: document.getElementById("log-prev-day"),
+    logNextDay: document.getElementById("log-next-day"),
+    logTotals: document.getElementById("log-totals"),
+    logList: document.getElementById("log-list"),
+    logEmpty: document.getElementById("log-empty"),
+    profileAllergens: document.getElementById("profile-allergens"),
+    profileDiets: document.getElementById("profile-diets"),
+    profileLimits: document.getElementById("profile-limits"),
+    profileSavedHint: document.getElementById("profile-saved-hint"),
     toast: document.getElementById("toast")
   };
 
   let lastScanTime = 0;
   const SCAN_DEBOUNCE_MS = 1500;
+  let currentProduct = null;
+  let currentLogDate = todayKey();
+  let savedHintTimer = null;
 
   // ---------- View switching ----------
-  els.tabBtns.forEach(btn => {
+  els.navBtns.forEach(btn => {
     btn.addEventListener("click", () => switchView(btn.dataset.view));
   });
 
   function switchView(view) {
-    els.tabBtns.forEach(b => {
+    els.navBtns.forEach(b => {
       const active = b.dataset.view === view;
       b.classList.toggle("active", active);
       b.setAttribute("aria-selected", String(active));
@@ -63,6 +95,8 @@
       el.classList.toggle("active", key === view);
     });
     if (view === "history") renderHistory();
+    if (view === "log") renderLogView();
+    if (view === "profile") renderProfileView();
     if (view !== "scanner") Scanner.stop();
   }
 
@@ -158,8 +192,10 @@
     els.result.classList.add("hidden");
   }
 
-  // ---------- Rendering ----------
+  // ---------- Rendering: result ----------
   function renderResult(product) {
+    currentProduct = product;
+
     els.resultImg.src = product.image || "";
     els.resultImg.style.visibility = product.image ? "visible" : "hidden";
     els.resultName.textContent = product.name;
@@ -167,20 +203,18 @@
     els.resultQty.textContent = product.quantity || "";
 
     const verdict = getVerdict(product);
-    els.verdictBadge.className = "verdict-badge " + verdict.tier;
-    els.verdictEmoji.textContent = verdict.emoji;
+    renderWarnings(product);
+    renderGauge(product, verdict);
+
     els.verdictLabel.textContent = verdict.label;
     els.verdictReason.textContent = verdict.reason;
 
-    els.nutriscoreBadge.textContent = product.nutriscoreGrade && "abcde".includes(product.nutriscoreGrade)
-      ? product.nutriscoreGrade.toUpperCase()
-      : "?";
-
     const nova = novaLabel(product.novaGroup);
-    els.novaBadge.textContent = product.novaGroup ? String(product.novaGroup) : "?";
+    els.novaBadge.textContent = nova.text;
     els.novaBadge.title = nova.detail;
 
-    renderNutrientLights(product.nutriments);
+    renderNutrientBars(els.nutrientLights, product.nutriments, NUTRIENT_ITEMS);
+    renderAlternatives(product, verdict); // fire-and-forget, fills in once loaded
 
     if (product.ingredientsText) {
       els.ingredientsText.textContent = product.ingredientsText;
@@ -207,27 +241,67 @@
     els.result.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function renderNutrientLights(n) {
-    const items = [
-      { key: "energyKcal", label: "Energy", unit: "kcal", raw: true },
-      { key: "fat", label: "Fat", unit: "g" },
-      { key: "saturatedFat", label: "Saturated Fat", unit: "g" },
-      { key: "sugars", label: "Sugars", unit: "g" },
-      { key: "salt", label: "Salt", unit: "g" },
-      { key: "proteins", label: "Protein", unit: "g", raw: true }
-    ];
+  function renderGauge(product, verdict) {
+    els.verdictRow.className = "verdict-row " + verdict.tier;
+    const fill = gaugeFillFor(product, verdict);
+    els.gaugeFillCircle.style.strokeDasharray = `${GAUGE_CIRCUMFERENCE}`;
+    els.gaugeFillCircle.style.strokeDashoffset = `${GAUGE_CIRCUMFERENCE * (1 - fill)}`;
+    els.gaugeGradeText.textContent = product.nutriscoreGrade && "abcde".includes(product.nutriscoreGrade)
+      ? product.nutriscoreGrade.toUpperCase()
+      : verdict.emoji;
+  }
 
-    els.nutrientLights.innerHTML = "";
-    items.forEach(item => {
-      const value = n[item.key];
-      const level = item.raw ? "unknown" : nutrientLevel(item.key, value);
-      const div = document.createElement("div");
-      div.className = "nutrient-chip " + (item.raw ? "" : level);
-      div.innerHTML = `
-        <span class="n-name">${item.label}</span>
-        <span class="n-value">${value == null ? "—" : (Math.round(value * 10) / 10) + item.unit}</span>
+  function renderWarnings(product) {
+    const profile = loadProfile();
+    const warnings = checkConflicts(product, profile);
+    if (warnings.length === 0) {
+      els.warningBanner.classList.add("hidden");
+      return;
+    }
+    els.warningList.innerHTML = warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("");
+    els.warningBanner.classList.remove("hidden");
+  }
+
+  async function renderAlternatives(product, verdict) {
+    els.alternativesSection.classList.add("hidden");
+    els.alternativesList.innerHTML = "";
+    if (verdict.tier === "good") return;
+
+    const alts = await fetchAlternatives(product);
+    if (!alts.length || currentProduct !== product) return; // user moved on before this resolved
+
+    els.alternativesList.innerHTML = "";
+    alts.forEach(alt => {
+      const card = document.createElement("div");
+      card.className = "alt-card";
+      card.innerHTML = `
+        ${alt.image ? `<img src="${escapeHtml(alt.image)}" alt="">` : `<div style="width:60px;height:60px;border-radius:8px;background:var(--card);margin:0 auto 6px"></div>`}
+        <div class="alt-name">${escapeHtml(alt.name)}</div>
+        <span class="alt-grade">${alt.nutriscoreGrade.toUpperCase()}</span>
       `;
-      els.nutrientLights.appendChild(div);
+      card.addEventListener("click", () => lookup(alt.barcode));
+      els.alternativesList.appendChild(card);
+    });
+    els.alternativesSection.classList.remove("hidden");
+  }
+
+  function renderNutrientBars(container, nutrients, items) {
+    container.innerHTML = "";
+    items.forEach(item => {
+      const value = nutrients[item.key];
+      const pct = value == null ? 0 : (percentOfRI(item.key, value) ?? 0);
+      const level = item.colored ? nutrientLevel(item.key, value) : "neutral";
+      const row = document.createElement("div");
+      row.className = "nutrient-bar-row";
+      const valueText = value == null ? "—" : `${Math.round(value * 10) / 10}${item.unit} · ${pct}% RI`;
+      row.innerHTML = `
+        <div class="n-top">
+          <span class="n-name">${item.label}</span>
+          <span class="n-value">${valueText}</span>
+        </div>
+        <div class="nutrient-bar-track"><div class="nutrient-bar-fill ${level}" style="width:${pct}%"></div></div>
+      `;
+      container.appendChild(row);
     });
   }
 
@@ -237,6 +311,121 @@
       document.getElementById(btn.dataset.target).classList.toggle("open");
     });
   });
+
+  // ---------- Log this ----------
+  els.btnLogThis.addEventListener("click", () => {
+    if (!currentProduct) return;
+    logProduct(currentProduct);
+    showToast(`Logged to today's diary`);
+  });
+
+  // ---------- Log view ----------
+  function renderLogView() {
+    els.logDateLabel.textContent = formatDateLabel(currentLogDate);
+    const entries = getEntriesForDate(currentLogDate);
+    const totals = computeTotals(entries);
+
+    renderNutrientBars(els.logTotals, totals, NUTRIENT_ITEMS);
+
+    els.logList.innerHTML = "";
+    els.logEmpty.classList.toggle("hidden", entries.length > 0);
+
+    entries.slice().reverse().forEach(entry => {
+      const li = document.createElement("li");
+      li.className = "history-item";
+      li.innerHTML = `
+        ${entry.image ? `<img src="${escapeHtml(entry.image)}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--bg-elevated)"></div>`}
+        <div class="h-info">
+          <div class="h-name">${escapeHtml(entry.name)}</div>
+          <div class="h-meta">${escapeHtml(entry.portionLabel)} · ${new Date(entry.loggedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+        </div>
+        <button class="btn btn-ghost small log-remove-btn" data-id="${entry.id}" title="Remove">✕</button>
+      `;
+      els.logList.appendChild(li);
+    });
+
+    els.logList.querySelectorAll(".log-remove-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        removeLogEntry(currentLogDate, btn.dataset.id);
+        renderLogView();
+      });
+    });
+  }
+
+  els.logPrevDay.addEventListener("click", () => {
+    currentLogDate = shiftDateKey(currentLogDate, -1);
+    renderLogView();
+  });
+  els.logNextDay.addEventListener("click", () => {
+    currentLogDate = shiftDateKey(currentLogDate, 1);
+    renderLogView();
+  });
+
+  // ---------- Profile view ----------
+  function renderProfileView() {
+    const profile = loadProfile();
+
+    els.profileAllergens.innerHTML = "";
+    ALLERGEN_OPTIONS.forEach(opt => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip-toggle" + (profile.allergens.includes(opt.tag) ? " selected" : "");
+      btn.textContent = opt.label;
+      btn.addEventListener("click", () => toggleProfileArray("allergens", opt.tag));
+      els.profileAllergens.appendChild(btn);
+    });
+
+    els.profileDiets.innerHTML = "";
+    DIET_OPTIONS.forEach(opt => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip-toggle" + (profile.diets.includes(opt.tag) ? " selected" : "");
+      btn.textContent = opt.label;
+      btn.addEventListener("click", () => toggleProfileArray("diets", opt.tag));
+      els.profileDiets.appendChild(btn);
+    });
+
+    els.profileLimits.innerHTML = "";
+    LIMIT_OPTIONS.forEach(opt => {
+      const row = document.createElement("div");
+      row.className = "limit-row";
+      const label = document.createElement("label");
+      label.textContent = opt.label;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.step = "0.1";
+      input.placeholder = opt.unit;
+      input.value = profile.limits[opt.key] ?? "";
+      input.addEventListener("change", () => {
+        const p = loadProfile();
+        p.limits = p.limits || {};
+        p.limits[opt.key] = input.value === "" ? null : Number(input.value);
+        saveProfile(p);
+        flashSaved();
+      });
+      row.appendChild(label);
+      row.appendChild(input);
+      els.profileLimits.appendChild(row);
+    });
+  }
+
+  function toggleProfileArray(field, tag) {
+    const p = loadProfile();
+    p[field] = p[field] || [];
+    const idx = p[field].indexOf(tag);
+    if (idx === -1) p[field].push(tag); else p[field].splice(idx, 1);
+    saveProfile(p);
+    renderProfileView();
+    flashSaved();
+  }
+
+  function flashSaved() {
+    els.profileSavedHint.classList.remove("hidden");
+    clearTimeout(savedHintTimer);
+    savedHintTimer = setTimeout(() => els.profileSavedHint.classList.add("hidden"), 1500);
+  }
 
   // ---------- History ----------
   function loadHistory() {
@@ -265,7 +454,7 @@
       li.className = "history-item";
       li.innerHTML = `
         <span class="history-dot ${verdict.tier}"></span>
-        ${product.image ? `<img src="${product.image}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--bg-elevated)"></div>`}
+        ${product.image ? `<img src="${escapeHtml(product.image)}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--bg-elevated)"></div>`}
         <div class="h-info">
           <div class="h-name">${escapeHtml(product.name)}</div>
           <div class="h-meta">${escapeHtml(product.brand || "")} · ${new Date(product.scannedAt).toLocaleDateString()}</div>

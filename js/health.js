@@ -88,3 +88,29 @@ function novaLabel(group) {
     default: return { text: "—", detail: "No processing data available." };
   }
 }
+
+// EU-style Reference Intake for an average adult, per day — the same numbers printed on packaging.
+const REFERENCE_INTAKE = {
+  energyKcal: 2000,
+  fat: 70,
+  saturatedFat: 20,
+  sugars: 90,
+  salt: 6,
+  fiber: 30,
+  proteins: 50
+};
+
+function percentOfRI(key, value) {
+  const ref = REFERENCE_INTAKE[key];
+  if (!ref || value == null) return null;
+  return Math.min(100, Math.round((value / ref) * 100));
+}
+
+const GRADE_GAUGE_FILL = { a: 0.95, b: 0.75, c: 0.55, d: 0.35, e: 0.15 };
+const TIER_GAUGE_FILL = { good: 0.75, moderate: 0.5, bad: 0.2, unknown: 0.05 };
+
+function gaugeFillFor(product, verdict) {
+  const grade = product.nutriscoreGrade;
+  if (grade && GRADE_GAUGE_FILL[grade] != null) return GRADE_GAUGE_FILL[grade];
+  return TIER_GAUGE_FILL[verdict.tier] ?? 0.05;
+}
