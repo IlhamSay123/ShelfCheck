@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>ShelfCheck — Is it healthy?</title>
+<meta name="description" content="Scan a food barcode and instantly see if it's healthy." />
+<meta name="theme-color" content="#0f172a" />
+
+<!-- PWA / iOS home screen -->
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="ShelfCheck" />
+<link rel="icon" href="icons/icon-192.png" />
+
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">🛒</span>
+      <span class="brand-name">ShelfCheck</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab-btn active" data-view="scanner" role="tab" aria-selected="true">Scan</button>
+      <button class="tab-btn" data-view="history" role="tab" aria-selected="false">History</button>
+    </nav>
+  </header>
+
+  <main class="views">
+
+    <!-- SCANNER VIEW -->
+    <section id="view-scanner" class="view active">
+
+      <div class="scan-card">
+        <div id="reader" class="reader"></div>
+        <div class="scan-frame" aria-hidden="true"></div>
+        <div class="scan-controls">
+          <button id="btn-start-scan" class="btn btn-primary btn-lg">
+            <span class="icon">📷</span> Start Camera Scan
+          </button>
+          <button id="btn-stop-scan" class="btn btn-ghost hidden">Stop</button>
+          <button id="btn-torch" class="btn btn-icon hidden" title="Toggle flashlight">🔦</button>
+          <button id="btn-switch-cam" class="btn btn-icon hidden" title="Switch camera">🔄</button>
+        </div>
+        <p id="scan-hint" class="hint">Point your camera at a barcode (EAN/UPC) on any packaged food.</p>
+      </div>
+
+      <div class="divider"><span>or enter manually</span></div>
+
+      <form id="manual-form" class="manual-form">
+        <input
+          id="manual-input"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          placeholder="Type barcode number, e.g. 3017620422003"
+          autocomplete="off"
+        />
+        <button type="submit" class="btn btn-secondary">Look up</button>
+      </form>
+
+      <!-- Loading -->
+      <div id="loading" class="state-box hidden">
+        <div class="spinner"></div>
+        <p>Looking up product…</p>
+      </div>
+
+      <!-- Error -->
+      <div id="error-box" class="state-box error hidden">
+        <p id="error-text"></p>
+        <button id="btn-retry" class="btn btn-secondary">Try again</button>
+      </div>
+
+      <!-- RESULT -->
+      <section id="result" class="result hidden">
+        <div class="result-header">
+          <img id="result-img" class="result-img" alt="" />
+          <div class="result-title">
+            <h2 id="result-name">—</h2>
+            <p id="result-brand" class="muted">—</p>
+            <p id="result-qty" class="muted small"></p>
+          </div>
+        </div>
+
+        <div id="verdict-badge" class="verdict-badge">
+          <span id="verdict-emoji">❔</span>
+          <div>
+            <div id="verdict-label" class="verdict-label">Unknown</div>
+            <div id="verdict-reason" class="verdict-reason"></div>
+          </div>
+        </div>
+
+        <div class="grade-row">
+          <div class="grade-chip">
+            <span class="grade-chip-title">Nutri-Score</span>
+            <span id="nutriscore-badge" class="grade-letter">?</span>
+          </div>
+          <div class="grade-chip">
+            <span class="grade-chip-title">Processing (NOVA)</span>
+            <span id="nova-badge" class="grade-letter">?</span>
+          </div>
+        </div>
+
+        <h3 class="section-title">Per 100g</h3>
+        <div id="nutrient-lights" class="nutrient-lights"></div>
+
+        <div id="ingredients-section" class="collapsible">
+          <button class="collapsible-toggle" data-target="ingredients-body">Ingredients ▾</button>
+          <div id="ingredients-body" class="collapsible-body">
+            <p id="ingredients-text" class="muted"></p>
+          </div>
+        </div>
+
+        <div id="allergens-section" class="collapsible hidden">
+          <button class="collapsible-toggle" data-target="allergens-body">Allergens ▾</button>
+          <div id="allergens-body" class="collapsible-body">
+            <p id="allergens-text" class="muted"></p>
+          </div>
+        </div>
+
+        <div id="additives-section" class="collapsible hidden">
+          <button class="collapsible-toggle" data-target="additives-body">Additives ▾</button>
+          <div id="additives-body" class="collapsible-body">
+            <p id="additives-text" class="muted"></p>
+          </div>
+        </div>
+
+        <button id="btn-scan-again" class="btn btn-primary btn-lg full-width">Scan Another</button>
+      </section>
+
+    </section>
+
+    <!-- HISTORY VIEW -->
+    <section id="view-history" class="view">
+      <div class="history-header">
+        <h2>Scan History</h2>
+        <button id="btn-clear-history" class="btn btn-ghost small">Clear</button>
+      </div>
+      <ul id="history-list" class="history-list"></ul>
+      <p id="history-empty" class="muted center hidden">No scans yet. Scan a product to see it here.</p>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/health.js"></script>
+<script src="js/scanner.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
