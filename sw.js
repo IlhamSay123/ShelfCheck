@@ -1,4 +1,4 @@
-const CACHE_NAME = "shelfcheck-v2";
+const CACHE_NAME = "shelfcheck-v3";
 const APP_SHELL = [
   "./",
   "./index.html",

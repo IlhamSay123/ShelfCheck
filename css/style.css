@@ -293,3 +293,9 @@ body {
 
 /* video element injected by html5-qrcode */
 #reader video { border-radius: var(--radius-sm); width: 100% !important; }
+
+#reader__scan_region { border-radius: var(--radius-sm); overflow: hidden; }
+
+/* our own zoom control (html5-qrcode's low-level API has no built-in UI for this) */
+.zoom-control { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 0 4px; }
+.zoom-control input[type="range"] { flex: 1; accent-color: var(--primary); }

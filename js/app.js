@@ -27,6 +27,8 @@
     btnStopScan: document.getElementById("btn-stop-scan"),
     btnTorch: document.getElementById("btn-torch"),
     btnSwitchCam: document.getElementById("btn-switch-cam"),
+    zoomControl: document.getElementById("zoom-control"),
+    zoomSlider: document.getElementById("zoom-slider"),
     scanHint: document.getElementById("scan-hint"),
     manualForm: document.getElementById("manual-form"),
     manualInput: document.getElementById("manual-input"),
@@ -101,11 +103,13 @@
   }
 
   // ---------- Scanning ----------
+  const SCANNING_HINT = "Fill the frame with the barcode and hold steady — use the zoom slider to get closer without moving.";
+
   els.btnStartScan.addEventListener("click", async () => {
     resetPanels();
     els.btnStartScan.classList.add("hidden");
     els.btnStopScan.classList.remove("hidden");
-    els.scanHint.textContent = "Align the barcode within the frame…";
+    els.scanHint.textContent = "Starting camera…";
 
     window.__onScanDecoded = handleDecoded;
 
@@ -117,18 +121,15 @@
     });
 
     if (Scanner.isRunning()) {
-      els.btnTorch.classList.remove("hidden");
+      els.scanHint.textContent = SCANNING_HINT;
       if (Scanner.hasMultipleCameras()) els.btnSwitchCam.classList.remove("hidden");
+      setupCameraControls();
     }
   });
 
   els.btnStopScan.addEventListener("click", async () => {
     await Scanner.stop();
-    els.btnStartScan.classList.remove("hidden");
-    els.btnStopScan.classList.add("hidden");
-    els.btnTorch.classList.add("hidden");
-    els.btnSwitchCam.classList.add("hidden");
-    els.scanHint.textContent = "Point your camera at a barcode (EAN/UPC) on any packaged food.";
+    resetCameraControlsUi();
   });
 
   els.btnTorch.addEventListener("click", async () => {
@@ -136,7 +137,39 @@
     els.btnTorch.style.opacity = on ? "1" : "0.6";
   });
 
-  els.btnSwitchCam.addEventListener("click", () => Scanner.switchCamera());
+  els.btnSwitchCam.addEventListener("click", async () => {
+    await Scanner.switchCamera();
+    setupCameraControls(); // the new camera may have different torch/zoom capabilities
+  });
+
+  els.zoomSlider.addEventListener("input", () => {
+    Scanner.setZoom(Number(els.zoomSlider.value));
+  });
+
+  function setupCameraControls() {
+    els.btnTorch.classList.toggle("hidden", !Scanner.hasTorch());
+    els.btnTorch.style.opacity = "0.6";
+
+    const zoomRange = Scanner.getZoomRange();
+    if (zoomRange) {
+      els.zoomSlider.min = zoomRange.min;
+      els.zoomSlider.max = zoomRange.max;
+      els.zoomSlider.step = zoomRange.step;
+      els.zoomSlider.value = zoomRange.min;
+      els.zoomControl.classList.remove("hidden");
+    } else {
+      els.zoomControl.classList.add("hidden");
+    }
+  }
+
+  function resetCameraControlsUi() {
+    els.btnStartScan.classList.remove("hidden");
+    els.btnStopScan.classList.add("hidden");
+    els.btnTorch.classList.add("hidden");
+    els.btnSwitchCam.classList.add("hidden");
+    els.zoomControl.classList.add("hidden");
+    els.scanHint.textContent = "Point your camera at a barcode (EAN/UPC) on any packaged food.";
+  }
 
   async function handleDecoded(barcode) {
     const now = Date.now();
@@ -144,10 +177,7 @@
     lastScanTime = now;
 
     await Scanner.stop();
-    els.btnStartScan.classList.remove("hidden");
-    els.btnStopScan.classList.add("hidden");
-    els.btnTorch.classList.add("hidden");
-    els.btnSwitchCam.classList.add("hidden");
+    resetCameraControlsUi();
 
     if (navigator.vibrate) navigator.vibrate(80);
     lookup(barcode);
