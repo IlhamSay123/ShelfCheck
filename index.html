@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
 <title>ShelfCheck — Is it healthy?</title>
 <meta name="description" content="Scan a food barcode and instantly see if it's healthy." />
-<meta name="theme-color" content="#0f172a" />
+<meta name="theme-color" content="#EAEEF2" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#1B1E24" media="(prefers-color-scheme: dark)" />
 
 <!-- PWA / iOS home screen -->
 <link rel="manifest" href="manifest.json" />
@@ -24,7 +25,7 @@
   <!-- Header -->
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">🛒</span>
+      <span class="brand-mark" aria-hidden="true">🛒</span>
       <span class="brand-name">ShelfCheck</span>
     </div>
   </header>
@@ -34,15 +35,40 @@
     <!-- SCANNER VIEW -->
     <section id="view-scanner" class="view active">
 
+      <div class="glass-panel" style="margin-bottom: 14px;">
+        <div class="trip-toggle-row">
+          <div>
+            <div class="trip-label">Trip mode</div>
+            <div class="trip-sub">Batch-scan a shopping trip and see a running tally</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="trip-toggle" aria-label="Trip mode" />
+            <span class="track" aria-hidden="true"></span>
+            <span class="thumb" aria-hidden="true"></span>
+          </label>
+        </div>
+
+        <div id="trip-panel" class="hidden">
+          <div id="trip-tally" class="trip-tally">
+            <div class="tally-chip good"><span id="trip-count-good" class="tally-count">0</span><span class="tally-label">Healthy</span></div>
+            <div class="tally-chip moderate"><span id="trip-count-moderate" class="tally-count">0</span><span class="tally-label">Moderate</span></div>
+            <div class="tally-chip bad"><span id="trip-count-bad" class="tally-count">0</span><span class="tally-label">Unhealthy</span></div>
+          </div>
+          <ul id="trip-list" class="trip-list"></ul>
+          <p id="trip-empty" class="trip-empty">Scan your first item to start this trip.</p>
+          <button id="btn-end-trip" class="btn btn-ghost small full-width">End trip</button>
+        </div>
+      </div>
+
       <div class="scan-card">
         <div id="reader" class="reader"></div>
         <div class="scan-controls">
           <button id="btn-start-scan" class="btn btn-primary btn-lg">
-            <span class="icon">📷</span> Start Camera Scan
+            <span class="icon" aria-hidden="true">📷</span> Start Camera Scan
           </button>
           <button id="btn-stop-scan" class="btn btn-ghost hidden">Stop</button>
-          <button id="btn-torch" class="btn btn-icon hidden" title="Toggle flashlight">🔦</button>
-          <button id="btn-switch-cam" class="btn btn-icon hidden" title="Switch camera">🔄</button>
+          <button id="btn-torch" class="btn btn-icon hidden" title="Toggle flashlight" aria-label="Toggle flashlight">🔦</button>
+          <button id="btn-switch-cam" class="btn btn-icon hidden" title="Switch camera" aria-label="Switch camera">🔄</button>
         </div>
         <div id="zoom-control" class="zoom-control hidden">
           <span aria-hidden="true">🔍</span>
@@ -66,8 +92,8 @@
       </form>
 
       <!-- Loading -->
-      <div id="loading" class="state-box hidden">
-        <div class="spinner"></div>
+      <div id="loading" class="state-box hidden" role="status" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
         <p>Looking up product…</p>
       </div>
 
@@ -88,8 +114,8 @@
           </div>
         </div>
 
-        <div id="warning-banner" class="warning-banner hidden">
-          <span class="warning-icon">⚠️</span>
+        <div id="warning-banner" class="warning-banner hidden" role="alert">
+          <span class="warning-icon" aria-hidden="true">⚠️</span>
           <ul id="warning-list"></ul>
         </div>
 
@@ -113,6 +139,13 @@
           </div>
         </div>
 
+        <div id="why-score-section" class="collapsible" style="border-top:none; margin-top:0; padding-top:0;">
+          <button class="collapsible-toggle" data-target="why-score-body" aria-expanded="false" aria-controls="why-score-body">Why this score? ▾</button>
+          <div id="why-score-body" class="collapsible-body">
+            <ul id="why-score-list" class="why-score"></ul>
+          </div>
+        </div>
+
         <section id="alternatives-section" class="alternatives hidden">
           <h3 class="section-title">Healthier alternatives</h3>
           <div id="alternatives-list" class="alt-scroll"></div>
@@ -122,28 +155,28 @@
         <div id="nutrient-lights" class="nutrient-bars"></div>
 
         <div id="ingredients-section" class="collapsible">
-          <button class="collapsible-toggle" data-target="ingredients-body">Ingredients ▾</button>
+          <button class="collapsible-toggle" data-target="ingredients-body" aria-expanded="false" aria-controls="ingredients-body">Ingredients ▾</button>
           <div id="ingredients-body" class="collapsible-body">
             <p id="ingredients-text" class="muted"></p>
           </div>
         </div>
 
         <div id="allergens-section" class="collapsible hidden">
-          <button class="collapsible-toggle" data-target="allergens-body">Allergens ▾</button>
+          <button class="collapsible-toggle" data-target="allergens-body" aria-expanded="false" aria-controls="allergens-body">Allergens ▾</button>
           <div id="allergens-body" class="collapsible-body">
             <p id="allergens-text" class="muted"></p>
           </div>
         </div>
 
         <div id="additives-section" class="collapsible hidden">
-          <button class="collapsible-toggle" data-target="additives-body">Additives ▾</button>
+          <button class="collapsible-toggle" data-target="additives-body" aria-expanded="false" aria-controls="additives-body">Additives ▾</button>
           <div id="additives-body" class="collapsible-body">
             <p id="additives-text" class="muted"></p>
           </div>
         </div>
 
         <div class="result-actions">
-          <button id="btn-log-this" class="btn btn-secondary btn-lg">📒 Log this</button>
+          <button id="btn-log-this" class="btn btn-secondary btn-lg"><span aria-hidden="true">📒</span> Log this</button>
           <button id="btn-scan-again" class="btn btn-primary btn-lg">Scan Another</button>
         </div>
       </section>
@@ -152,65 +185,71 @@
 
     <!-- LOG VIEW -->
     <section id="view-log" class="view">
-      <div class="log-header">
-        <button id="log-prev-day" class="btn btn-icon small">‹</button>
-        <h2 id="log-date-label">Today</h2>
-        <button id="log-next-day" class="btn btn-icon small">›</button>
+      <div class="glass-panel">
+        <div class="log-header">
+          <button id="log-prev-day" class="btn btn-icon small" aria-label="Previous day">‹</button>
+          <h2 id="log-date-label">Today</h2>
+          <button id="log-next-day" class="btn btn-icon small" aria-label="Next day">›</button>
+        </div>
+
+        <h3 class="section-title">Daily totals</h3>
+        <div id="log-totals" class="nutrient-bars"></div>
+
+        <h3 class="section-title">Logged items</h3>
+        <ul id="log-list" class="history-list"></ul>
+        <p id="log-empty" class="muted center hidden">Nothing logged for this day yet. Scan something and tap "Log this".</p>
       </div>
-
-      <h3 class="section-title">Daily totals</h3>
-      <div id="log-totals" class="nutrient-bars"></div>
-
-      <h3 class="section-title">Logged items</h3>
-      <ul id="log-list" class="history-list"></ul>
-      <p id="log-empty" class="muted center hidden">Nothing logged for this day yet. Scan something and tap "Log this".</p>
     </section>
 
     <!-- HISTORY VIEW -->
     <section id="view-history" class="view">
-      <div class="history-header">
-        <h2>Scan History</h2>
-        <button id="btn-clear-history" class="btn btn-ghost small">Clear</button>
+      <div class="glass-panel">
+        <div class="history-header">
+          <h2>Scan History</h2>
+          <button id="btn-clear-history" class="btn btn-ghost small">Clear</button>
+        </div>
+        <ul id="history-list" class="history-list"></ul>
+        <p id="history-empty" class="muted center hidden">No scans yet. Scan a product to see it here.</p>
       </div>
-      <ul id="history-list" class="history-list"></ul>
-      <p id="history-empty" class="muted center hidden">No scans yet. Scan a product to see it here.</p>
     </section>
 
     <!-- PROFILE VIEW -->
     <section id="view-profile" class="view">
-      <h2>Your Profile</h2>
-      <p class="muted small">Set your allergens, diet and nutrient limits — ShelfCheck flags conflicts on every scan.</p>
+      <div class="glass-panel">
+        <h2>Your Profile</h2>
+        <p class="muted small">Set your allergens, diet and nutrient limits — ShelfCheck flags conflicts on every scan.</p>
 
-      <h3 class="section-title">Allergens to avoid</h3>
-      <div id="profile-allergens" class="chip-grid"></div>
+        <h3 class="section-title" style="margin-top:18px;">Allergens to avoid</h3>
+        <div id="profile-allergens" class="chip-grid"></div>
 
-      <h3 class="section-title">Diet</h3>
-      <div id="profile-diets" class="chip-grid"></div>
+        <h3 class="section-title">Diet</h3>
+        <div id="profile-diets" class="chip-grid"></div>
 
-      <h3 class="section-title">Personal nutrient limits (per 100g)</h3>
-      <div id="profile-limits" class="limits-grid"></div>
+        <h3 class="section-title">Personal nutrient limits (per 100g)</h3>
+        <div id="profile-limits" class="limits-grid"></div>
 
-      <p id="profile-saved-hint" class="muted small center hidden">Saved ✓</p>
+        <p id="profile-saved-hint" class="muted small center hidden">Saved ✓</p>
+      </div>
     </section>
 
   </main>
 
   <nav class="bottom-nav" role="tablist" aria-label="Sections">
     <button class="nav-btn active" data-view="scanner" role="tab" aria-selected="true">
-      <span class="nav-icon">📷</span><span class="nav-label">Scan</span>
+      <span class="nav-icon" aria-hidden="true">📷</span><span class="nav-label">Scan</span>
     </button>
     <button class="nav-btn" data-view="log" role="tab" aria-selected="false">
-      <span class="nav-icon">📒</span><span class="nav-label">Log</span>
+      <span class="nav-icon" aria-hidden="true">📒</span><span class="nav-label">Log</span>
     </button>
     <button class="nav-btn" data-view="history" role="tab" aria-selected="false">
-      <span class="nav-icon">🕘</span><span class="nav-label">History</span>
+      <span class="nav-icon" aria-hidden="true">🕘</span><span class="nav-label">History</span>
     </button>
     <button class="nav-btn" data-view="profile" role="tab" aria-selected="false">
-      <span class="nav-icon">👤</span><span class="nav-label">Profile</span>
+      <span class="nav-icon" aria-hidden="true">👤</span><span class="nav-label">Profile</span>
     </button>
   </nav>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 </div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -218,6 +257,7 @@
 <script src="js/health.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/log.js"></script>
+<script src="js/trip.js"></script>
 <script src="js/scanner.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -73,7 +73,16 @@
     profileDiets: document.getElementById("profile-diets"),
     profileLimits: document.getElementById("profile-limits"),
     profileSavedHint: document.getElementById("profile-saved-hint"),
-    toast: document.getElementById("toast")
+    toast: document.getElementById("toast"),
+    tripToggle: document.getElementById("trip-toggle"),
+    tripPanel: document.getElementById("trip-panel"),
+    tripCountGood: document.getElementById("trip-count-good"),
+    tripCountModerate: document.getElementById("trip-count-moderate"),
+    tripCountBad: document.getElementById("trip-count-bad"),
+    tripList: document.getElementById("trip-list"),
+    tripEmpty: document.getElementById("trip-empty"),
+    btnEndTrip: document.getElementById("btn-end-trip"),
+    whyScoreList: document.getElementById("why-score-list")
   };
 
   let lastScanTime = 0;
@@ -183,6 +192,50 @@
     lookup(barcode);
   }
 
+  // ---------- Trip mode ----------
+  els.tripToggle.addEventListener("change", () => {
+    const trip = setTripActive(els.tripToggle.checked);
+    if (!trip.active) endTrip();
+    renderTripUI();
+  });
+
+  els.btnEndTrip.addEventListener("click", () => {
+    endTrip();
+    els.tripToggle.checked = false;
+    renderTripUI();
+    showToast("Trip ended");
+  });
+
+  function renderTripUI() {
+    const trip = loadTrip();
+    els.tripToggle.checked = trip.active;
+    els.tripPanel.classList.toggle("hidden", !trip.active);
+    if (!trip.active) return;
+
+    const tally = tripTally(trip);
+    els.tripCountGood.textContent = tally.good;
+    els.tripCountModerate.textContent = tally.moderate;
+    els.tripCountBad.textContent = tally.bad;
+
+    els.tripEmpty.classList.toggle("hidden", trip.items.length > 0);
+    els.tripList.innerHTML = "";
+    trip.items.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "history-item";
+      li.innerHTML = `
+        <span class="history-dot ${item.tier}"></span>
+        ${item.image ? `<img src="${escapeHtml(item.image)}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--glass)"></div>`}
+        <div class="h-info">
+          <div class="h-name">${escapeHtml(item.name)}</div>
+          <div class="h-meta">${new Date(item.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+        </div>
+      `;
+      els.tripList.appendChild(li);
+    });
+  }
+
+  renderTripUI();
+
   // ---------- Manual entry ----------
   els.manualForm.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -205,8 +258,13 @@
     try {
       const product = await fetchProductByBarcode(barcode);
       els.loading.classList.add("hidden");
-      renderResult(product);
+      const verdict = renderResult(product);
       saveToHistory(product);
+      if (loadTrip().active) {
+        addToTrip(product, verdict);
+        renderTripUI();
+        showToast(`Added to trip — ${verdict.label.toLowerCase()}`);
+      }
     } catch (err) {
       els.loading.classList.add("hidden");
       els.errorBox.classList.remove("hidden");
@@ -245,6 +303,7 @@
 
     renderNutrientBars(els.nutrientLights, product.nutriments, NUTRIENT_ITEMS);
     renderAlternatives(product, verdict); // fire-and-forget, fills in once loaded
+    renderWhyScore(product, verdict);
 
     if (product.ingredientsText) {
       els.ingredientsText.textContent = product.ingredientsText;
@@ -269,6 +328,14 @@
 
     els.result.classList.remove("hidden");
     els.result.scrollIntoView({ behavior: "smooth", block: "start" });
+    return verdict;
+  }
+
+  function renderWhyScore(product, verdict) {
+    const factors = explainVerdict(product, verdict);
+    els.whyScoreList.innerHTML = factors.map(f => `
+      <li><span class="factor-icon" aria-hidden="true">${f.icon}</span><span>${escapeHtml(f.text)}</span></li>
+    `).join("");
   }
 
   function renderGauge(product, verdict) {
@@ -305,7 +372,7 @@
       const card = document.createElement("div");
       card.className = "alt-card";
       card.innerHTML = `
-        ${alt.image ? `<img src="${escapeHtml(alt.image)}" alt="">` : `<div style="width:60px;height:60px;border-radius:8px;background:var(--card);margin:0 auto 6px"></div>`}
+        ${alt.image ? `<img src="${escapeHtml(alt.image)}" alt="">` : `<div style="width:60px;height:60px;border-radius:8px;background:var(--glass);margin:0 auto 6px"></div>`}
         <div class="alt-name">${escapeHtml(alt.name)}</div>
         <span class="alt-grade">${alt.nutriscoreGrade.toUpperCase()}</span>
       `;
@@ -338,7 +405,8 @@
   // Collapsibles
   document.querySelectorAll(".collapsible-toggle").forEach(btn => {
     btn.addEventListener("click", () => {
-      document.getElementById(btn.dataset.target).classList.toggle("open");
+      const open = document.getElementById(btn.dataset.target).classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(open));
     });
   });
 
@@ -364,7 +432,7 @@
       const li = document.createElement("li");
       li.className = "history-item";
       li.innerHTML = `
-        ${entry.image ? `<img src="${escapeHtml(entry.image)}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--bg-elevated)"></div>`}
+        ${entry.image ? `<img src="${escapeHtml(entry.image)}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--glass)"></div>`}
         <div class="h-info">
           <div class="h-name">${escapeHtml(entry.name)}</div>
           <div class="h-meta">${escapeHtml(entry.portionLabel)} · ${new Date(entry.loggedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
@@ -484,7 +552,7 @@
       li.className = "history-item";
       li.innerHTML = `
         <span class="history-dot ${verdict.tier}"></span>
-        ${product.image ? `<img src="${escapeHtml(product.image)}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--bg-elevated)"></div>`}
+        ${product.image ? `<img src="${escapeHtml(product.image)}" alt="">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--glass)"></div>`}
         <div class="h-info">
           <div class="h-name">${escapeHtml(product.name)}</div>
           <div class="h-meta">${escapeHtml(product.brand || "")} · ${new Date(product.scannedAt).toLocaleDateString()}</div>

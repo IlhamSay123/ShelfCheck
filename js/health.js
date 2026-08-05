@@ -76,7 +76,50 @@ function getVerdict(product) {
     reason = "Estimated from sugar, fat, saturated fat & salt levels (no Nutri-Score available).";
   }
 
-  return { tier, ...copy, reason };
+  return { tier, ...copy, reason, source, novaDowngraded };
+}
+
+const NUTRIENT_LABELS = { fat: "Fat", saturatedFat: "Saturated fat", sugars: "Sugars", salt: "Salt" };
+
+// Human-readable breakdown of why a product got its verdict, for the "why this score" panel.
+function explainVerdict(product, verdict) {
+  const factors = [];
+  const grade = product.nutriscoreGrade;
+
+  if (verdict.source === "nutriscore") {
+    factors.push({
+      icon: "📊",
+      text: `Nutri-Score ${grade.toUpperCase()} (from Open Food Facts) weighs sugar, saturated fat, salt and energy against fibre, protein and fruit/vegetable content.`
+    });
+  } else {
+    factors.push({
+      icon: "🧮",
+      text: "This product has no official Nutri-Score, so the verdict is estimated from sugar, fat, saturated fat and salt levels per 100g."
+    });
+  }
+
+  ["sugars", "saturatedFat", "fat", "salt"].forEach(key => {
+    const level = nutrientLevel(key, product.nutriments[key]);
+    if (level !== "high" && level !== "low") return;
+    const value = product.nutriments[key];
+    const label = NUTRIENT_LABELS[key];
+    const threshold = level === "high" ? THRESHOLDS[key].high : THRESHOLDS[key].low;
+    factors.push({
+      icon: level === "high" ? "🔺" : "🔻",
+      text: `${label} is ${level} — ${value}g per 100g, ${level === "high" ? "above" : "at or below"} the ${threshold}g ${level} threshold.`
+    });
+  });
+
+  if (product.novaGroup === 4) {
+    factors.push({
+      icon: "⚙️",
+      text: verdict.novaDowngraded
+        ? "Ultra-processed (NOVA group 4) — this downgraded an otherwise good Nutri-Score, since heavy processing isn't captured by Nutri-Score alone."
+        : "Ultra-processed (NOVA group 4) — indicates significant industrial processing beyond the nutrient breakdown above."
+    });
+  }
+
+  return factors;
 }
 
 function novaLabel(group) {
