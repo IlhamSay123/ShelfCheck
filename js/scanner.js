@@ -1,6 +1,6 @@
 // Camera barcode scanning wrapper around html5-qrcode
 
-const Scanner = (() => {
+export const Scanner = (() => {
   let html5QrCode = null;
   let currentCameraId = null;
   let cameras = [];
@@ -64,7 +64,7 @@ const Scanner = (() => {
 
     try {
       cameras = await Html5Qrcode.getCameras();
-    } catch (e) {
+    } catch {
       cameras = [];
     }
 
@@ -108,7 +108,7 @@ const Scanner = (() => {
     try {
       await html5QrCode.stop();
       await html5QrCode.clear();
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
     running = false;
     torchOn = false;
   }
@@ -118,7 +118,7 @@ const Scanner = (() => {
     torchOn = !torchOn;
     try {
       await html5QrCode.applyVideoConstraints({ advanced: [{ torch: torchOn }] });
-    } catch (e) {
+    } catch {
       torchOn = false;
       return false;
     }
@@ -129,7 +129,7 @@ const Scanner = (() => {
     if (!html5QrCode || !running) return false;
     try {
       return html5QrCode.getRunningTrackCameraCapabilities().torchFeature().isSupported();
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -141,7 +141,7 @@ const Scanner = (() => {
       const zoom = html5QrCode.getRunningTrackCameraCapabilities().zoomFeature();
       if (!zoom.isSupported()) return null;
       return { min: zoom.min(), max: zoom.max(), step: zoom.step() || 0.1 };
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -150,7 +150,7 @@ const Scanner = (() => {
     if (!html5QrCode || !running) return;
     try {
       await html5QrCode.applyVideoConstraints({ advanced: [{ zoom: value }] });
-    } catch (e) { /* ignore — slider just won't do anything on this device */ }
+    } catch { /* ignore — slider just won't do anything on this device */ }
   }
 
   async function switchCamera() {
@@ -168,7 +168,7 @@ const Scanner = (() => {
         () => {}
       );
       running = true;
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
     return true;
   }
 

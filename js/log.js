@@ -1,26 +1,60 @@
+// @ts-check
 // Daily nutrient log: "log this" a scanned product against a per-day diary
 
+/** @typedef {import("./api.js").Product} Product */
+/** @typedef {import("./api.js").Nutriments} Nutriments */
+
+/**
+ * @typedef {Object} LogEntry
+ * @property {string} id
+ * @property {string} barcode
+ * @property {string} name
+ * @property {string} image
+ * @property {string} portionLabel
+ * @property {Nutriments} nutrients
+ * @property {number} loggedAt
+ */
+
+/** @typedef {Record<string, LogEntry[]>} DailyLog */
+
 const LOG_KEY = "shelfcheck_log_v1";
+/** @type {(keyof Nutriments)[]} */
 const NUTRIENT_KEYS = ["energyKcal", "fat", "saturatedFat", "sugars", "salt", "fiber", "proteins"];
 
-function todayKey(date = new Date()) {
-  return date.toISOString().slice(0, 10); // YYYY-MM-DD, local-ish enough for a food diary
+/**
+ * @param {Date} [date]
+ * @returns {string}
+ */
+export function todayKey(date = new Date()) {
+  // Built from local getters, not toISOString() (which is UTC) — shiftDateKey()
+  // constructs its Date in local time, and mixing the two silently drifts the
+  // diary's day boundary by one for anyone east of UTC.
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
+/** @returns {DailyLog} */
 function loadLog() {
   try {
-    return JSON.parse(localStorage.getItem(LOG_KEY)) || {};
-  } catch (e) {
+    return JSON.parse(/** @type {string} */ (localStorage.getItem(LOG_KEY))) || {};
+  } catch {
     return {};
   }
 }
 
+/** @param {DailyLog} log */
 function saveLog(log) {
   localStorage.setItem(LOG_KEY, JSON.stringify(log));
 }
 
-// Prefers per-serving nutrition (what you actually ate); falls back to per-100g if OFF has no serving data.
-function portionForLog(product) {
+/**
+ * Prefers per-serving nutrition (what you actually ate); falls back to per-100g if OFF has no serving data.
+ * @param {Product} product
+ * @returns {{label: string, nutrients: Nutriments}}
+ */
+export function portionForLog(product) {
   const hasServing = NUTRIENT_KEYS.some(k => product.servingNutriments[k] != null);
   if (hasServing) {
     return {
@@ -34,7 +68,12 @@ function portionForLog(product) {
   };
 }
 
-function logProduct(product, dateKey = todayKey()) {
+/**
+ * @param {Product} product
+ * @param {string} [dateKey]
+ * @returns {LogEntry[]}
+ */
+export function logProduct(product, dateKey = todayKey()) {
   const log = loadLog();
   if (!log[dateKey]) log[dateKey] = [];
 
@@ -53,7 +92,12 @@ function logProduct(product, dateKey = todayKey()) {
   return log[dateKey];
 }
 
-function removeLogEntry(dateKey, entryId) {
+/**
+ * @param {string} dateKey
+ * @param {string} entryId
+ * @returns {LogEntry[]}
+ */
+export function removeLogEntry(dateKey, entryId) {
   const log = loadLog();
   if (!log[dateKey]) return [];
   log[dateKey] = log[dateKey].filter(e => e.id !== entryId);
@@ -62,12 +106,21 @@ function removeLogEntry(dateKey, entryId) {
   return log[dateKey] || [];
 }
 
-function getEntriesForDate(dateKey) {
+/**
+ * @param {string} dateKey
+ * @returns {LogEntry[]}
+ */
+export function getEntriesForDate(dateKey) {
   const log = loadLog();
   return log[dateKey] || [];
 }
 
-function computeTotals(entries) {
+/**
+ * @param {LogEntry[]} entries
+ * @returns {Nutriments}
+ */
+export function computeTotals(entries) {
+  /** @type {any} */
   const totals = {};
   NUTRIENT_KEYS.forEach(k => { totals[k] = 0; });
   entries.forEach(entry => {
@@ -79,13 +132,22 @@ function computeTotals(entries) {
   return totals;
 }
 
-function shiftDateKey(dateKey, deltaDays) {
+/**
+ * @param {string} dateKey
+ * @param {number} deltaDays
+ * @returns {string}
+ */
+export function shiftDateKey(dateKey, deltaDays) {
   const d = new Date(dateKey + "T00:00:00");
   d.setDate(d.getDate() + deltaDays);
   return todayKey(d);
 }
 
-function formatDateLabel(dateKey) {
+/**
+ * @param {string} dateKey
+ * @returns {string}
+ */
+export function formatDateLabel(dateKey) {
   const d = new Date(dateKey + "T00:00:00");
   const today = todayKey();
   const yesterday = shiftDateKey(today, -1);

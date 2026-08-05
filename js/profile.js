@@ -1,8 +1,19 @@
+// @ts-check
 // Personal diet/allergen profile: storage + conflict checking against a product
+
+/** @typedef {import("./api.js").Product} Product */
+/** @typedef {import("./api.js").Nutriments} Nutriments */
+
+/**
+ * @typedef {Object} Profile
+ * @property {string[]} allergens
+ * @property {string[]} diets
+ * @property {Partial<Record<keyof Nutriments, number|string|null>>} limits
+ */
 
 const PROFILE_KEY = "shelfcheck_profile_v1";
 
-const ALLERGEN_OPTIONS = [
+export const ALLERGEN_OPTIONS = [
   { tag: "gluten", label: "Gluten" },
   { tag: "milk", label: "Dairy / Milk" },
   { tag: "eggs", label: "Eggs" },
@@ -19,38 +30,48 @@ const ALLERGEN_OPTIONS = [
   { tag: "lupin", label: "Lupin" }
 ];
 
-const DIET_OPTIONS = [
+export const DIET_OPTIONS = [
   { tag: "vegan", label: "Vegan" },
   { tag: "vegetarian", label: "Vegetarian" },
   { tag: "halal", label: "Halal" },
   { tag: "kosher", label: "Kosher" }
 ];
 
-const LIMIT_OPTIONS = [
+/** @type {{key: keyof Nutriments, label: string, unit: string}[]} */
+export const LIMIT_OPTIONS = [
   { key: "sugars", label: "Max sugar per 100g", unit: "g" },
   { key: "salt", label: "Max salt per 100g", unit: "g" },
   { key: "saturatedFat", label: "Max saturated fat per 100g", unit: "g" }
 ];
 
+/** @returns {Profile} */
 function defaultProfile() {
   return { allergens: [], diets: [], limits: {} };
 }
 
-function loadProfile() {
+/** @returns {Profile} */
+export function loadProfile() {
   try {
-    const saved = JSON.parse(localStorage.getItem(PROFILE_KEY));
+    const saved = JSON.parse(/** @type {string} */ (localStorage.getItem(PROFILE_KEY)));
     return { ...defaultProfile(), ...saved };
-  } catch (e) {
+  } catch {
     return defaultProfile();
   }
 }
 
-function saveProfile(profile) {
+/** @param {Profile} profile */
+export function saveProfile(profile) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
 }
 
-// Returns a list of human-readable warning strings, or [] if no conflicts / no profile set.
-function checkConflicts(product, profile) {
+/**
+ * Returns a list of human-readable warning strings, or [] if no conflicts / no profile set.
+ * @param {Product} product
+ * @param {Profile} profile
+ * @returns {string[]}
+ */
+export function checkConflicts(product, profile) {
+  /** @type {string[]} */
   const warnings = [];
 
   const matchedAllergens = (profile.allergens || []).filter(tag =>
@@ -96,7 +117,11 @@ function checkConflicts(product, profile) {
   return warnings;
 }
 
-function hasProfileSet(profile) {
+/**
+ * @param {Profile} profile
+ * @returns {boolean}
+ */
+export function hasProfileSet(profile) {
   return (profile.allergens || []).length > 0
     || (profile.diets || []).length > 0
     || Object.values(profile.limits || {}).some(v => v != null && v !== "");

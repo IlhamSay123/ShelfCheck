@@ -1,24 +1,51 @@
+// @ts-check
 // Shopping trip mode: batch-scan a session, track a running healthy/moderate/unhealthy tally
+
+/** @typedef {import("./api.js").Product} Product */
+/** @typedef {import("./health.js").Verdict} Verdict */
+/** @typedef {import("./health.js").Tier} Tier */
+
+/**
+ * @typedef {Object} TripItem
+ * @property {string} barcode
+ * @property {string} name
+ * @property {string} image
+ * @property {Tier} tier
+ * @property {number} scannedAt
+ */
+
+/**
+ * @typedef {Object} Trip
+ * @property {boolean} active
+ * @property {TripItem[]} items
+ */
 
 const TRIP_KEY = "shelfcheck_trip_v1";
 
+/** @returns {Trip} */
 function defaultTrip() {
   return { active: false, items: [] };
 }
 
-function loadTrip() {
+/** @returns {Trip} */
+export function loadTrip() {
   try {
-    return { ...defaultTrip(), ...JSON.parse(localStorage.getItem(TRIP_KEY)) };
-  } catch (e) {
+    return { ...defaultTrip(), ...JSON.parse(/** @type {string} */ (localStorage.getItem(TRIP_KEY))) };
+  } catch {
     return defaultTrip();
   }
 }
 
+/** @param {Trip} trip */
 function saveTrip(trip) {
   localStorage.setItem(TRIP_KEY, JSON.stringify(trip));
 }
 
-function setTripActive(active) {
+/**
+ * @param {boolean} active
+ * @returns {Trip}
+ */
+export function setTripActive(active) {
   const trip = loadTrip();
   trip.active = active;
   if (active && trip.items.length === 0) trip.items = [];
@@ -26,7 +53,12 @@ function setTripActive(active) {
   return trip;
 }
 
-function addToTrip(product, verdict) {
+/**
+ * @param {Product} product
+ * @param {Verdict} verdict
+ * @returns {Trip}
+ */
+export function addToTrip(product, verdict) {
   const trip = loadTrip();
   if (!trip.active) return trip;
   trip.items.unshift({
@@ -40,15 +72,22 @@ function addToTrip(product, verdict) {
   return trip;
 }
 
-function endTrip() {
+/** @returns {Trip} */
+export function endTrip() {
   saveTrip(defaultTrip());
   return defaultTrip();
 }
 
-function tripTally(trip) {
+/**
+ * @param {Trip} trip
+ * @returns {{good: number, moderate: number, bad: number}}
+ */
+export function tripTally(trip) {
   const tally = { good: 0, moderate: 0, bad: 0 };
   trip.items.forEach(item => {
-    if (tally[item.tier] != null) tally[item.tier]++;
+    if (item.tier === "good" || item.tier === "moderate" || item.tier === "bad") {
+      tally[item.tier]++;
+    }
   });
   return tally;
 }

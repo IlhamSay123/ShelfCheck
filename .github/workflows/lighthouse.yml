@@ -1,0 +1,24 @@
+name: Lighthouse CI
+
+# Audits the live GitHub Pages URL (this is a PWA — service worker/installability
+# checks need real HTTPS, which a local static server can't provide). Runs after
+# pushes to main so it reflects what's actually deployed, plus manual dispatch.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Small buffer for Pages' deploy propagation so this doesn't audit stale content.
+      - run: sleep 45
+
+      - uses: treosh/lighthouse-ci-action@v11
+        with:
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true

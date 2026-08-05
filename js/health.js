@@ -1,14 +1,42 @@
+// @ts-check
 // Health verdict + nutrient traffic-light logic
 
+/** @typedef {import("./api.js").Product} Product */
+/** @typedef {import("./api.js").Nutriments} Nutriments */
+
+/** @typedef {"good"|"moderate"|"bad"|"unknown"} Tier */
+/** @typedef {"low"|"medium"|"high"|"unknown"} NutrientLevel */
+
+/**
+ * @typedef {Object} Verdict
+ * @property {Tier} tier
+ * @property {string} emoji
+ * @property {string} label
+ * @property {string} reason
+ * @property {"nutriscore"|"fallback"} source
+ * @property {boolean} novaDowngraded
+ */
+
+/**
+ * @typedef {Object} VerdictFactor
+ * @property {string} icon
+ * @property {string} text
+ */
+
 // FSA-style per-100g thresholds (solid food)
-const THRESHOLDS = {
+export const THRESHOLDS = {
   fat:          { low: 3,   high: 17.5 },
   saturatedFat: { low: 1.5, high: 5 },
   sugars:       { low: 5,   high: 22.5 },
   salt:         { low: 0.3, high: 1.5 }
 };
 
-function nutrientLevel(key, value) {
+/**
+ * @param {keyof typeof THRESHOLDS} key
+ * @param {number|null|undefined} value
+ * @returns {NutrientLevel}
+ */
+export function nutrientLevel(key, value) {
   if (value == null) return "unknown";
   const t = THRESHOLDS[key];
   if (!t) return "unknown";
@@ -17,8 +45,13 @@ function nutrientLevel(key, value) {
   return "medium";
 }
 
-function computeFallbackScore(nutriments) {
-  // Used only when Open Food Facts has no Nutri-Score for the product.
+/**
+ * Used only when Open Food Facts has no Nutri-Score for the product.
+ * @param {Nutriments} nutriments
+ * @returns {Tier}
+ */
+export function computeFallbackScore(nutriments) {
+  /** @type {(keyof typeof THRESHOLDS)[]} */
   const keys = ["fat", "saturatedFat", "sugars", "salt"];
   let high = 0, low = 0, known = 0;
   keys.forEach(k => {
@@ -37,9 +70,15 @@ function computeFallbackScore(nutriments) {
   return "moderate";
 }
 
-function getVerdict(product) {
+/**
+ * @param {Product} product
+ * @returns {Verdict}
+ */
+export function getVerdict(product) {
   const grade = product.nutriscoreGrade;
+  /** @type {Tier} */
   let tier;
+  /** @type {"nutriscore"|"fallback"} */
   let source;
 
   if (grade && "abcde".includes(grade)) {
@@ -81,8 +120,13 @@ function getVerdict(product) {
 
 const NUTRIENT_LABELS = { fat: "Fat", saturatedFat: "Saturated fat", sugars: "Sugars", salt: "Salt" };
 
-// Human-readable breakdown of why a product got its verdict, for the "why this score" panel.
-function explainVerdict(product, verdict) {
+/**
+ * Human-readable breakdown of why a product got its verdict, for the "why this score" panel.
+ * @param {Product} product
+ * @param {Verdict} verdict
+ * @returns {VerdictFactor[]}
+ */
+export function explainVerdict(product, verdict) {
   const factors = [];
   const grade = product.nutriscoreGrade;
 
@@ -98,7 +142,9 @@ function explainVerdict(product, verdict) {
     });
   }
 
-  ["sugars", "saturatedFat", "fat", "salt"].forEach(key => {
+  /** @type {(keyof typeof THRESHOLDS)[]} */
+  const factorKeys = ["sugars", "saturatedFat", "fat", "salt"];
+  factorKeys.forEach(key => {
     const level = nutrientLevel(key, product.nutriments[key]);
     if (level !== "high" && level !== "low") return;
     const value = product.nutriments[key];
@@ -122,7 +168,11 @@ function explainVerdict(product, verdict) {
   return factors;
 }
 
-function novaLabel(group) {
+/**
+ * @param {number|null|undefined} group
+ * @returns {{text: string, detail: string}}
+ */
+export function novaLabel(group) {
   switch (group) {
     case 1: return { text: "1 · Unprocessed", detail: "Unprocessed or minimally processed food." };
     case 2: return { text: "2 · Processed culinary", detail: "Processed culinary ingredient." };
@@ -133,7 +183,7 @@ function novaLabel(group) {
 }
 
 // EU-style Reference Intake for an average adult, per day — the same numbers printed on packaging.
-const REFERENCE_INTAKE = {
+export const REFERENCE_INTAKE = {
   energyKcal: 2000,
   fat: 70,
   saturatedFat: 20,
@@ -143,7 +193,12 @@ const REFERENCE_INTAKE = {
   proteins: 50
 };
 
-function percentOfRI(key, value) {
+/**
+ * @param {keyof typeof REFERENCE_INTAKE} key
+ * @param {number|null|undefined} value
+ * @returns {number|null}
+ */
+export function percentOfRI(key, value) {
   const ref = REFERENCE_INTAKE[key];
   if (!ref || value == null) return null;
   return Math.min(100, Math.round((value / ref) * 100));
@@ -152,8 +207,15 @@ function percentOfRI(key, value) {
 const GRADE_GAUGE_FILL = { a: 0.95, b: 0.75, c: 0.55, d: 0.35, e: 0.15 };
 const TIER_GAUGE_FILL = { good: 0.75, moderate: 0.5, bad: 0.2, unknown: 0.05 };
 
-function gaugeFillFor(product, verdict) {
+/**
+ * @param {Product} product
+ * @param {Verdict} verdict
+ * @returns {number}
+ */
+export function gaugeFillFor(product, verdict) {
   const grade = product.nutriscoreGrade;
-  if (grade && GRADE_GAUGE_FILL[grade] != null) return GRADE_GAUGE_FILL[grade];
+  if (grade && GRADE_GAUGE_FILL[/** @type {keyof typeof GRADE_GAUGE_FILL} */ (grade)] != null) {
+    return GRADE_GAUGE_FILL[/** @type {keyof typeof GRADE_GAUGE_FILL} */ (grade)];
+  }
   return TIER_GAUGE_FILL[verdict.tier] ?? 0.05;
 }

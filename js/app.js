@@ -1,4 +1,11 @@
 // Main app controller
+import { fetchProductByBarcode, fetchAlternatives } from "./api.js";
+import { getVerdict, novaLabel, explainVerdict, percentOfRI, gaugeFillFor, nutrientLevel } from "./health.js";
+import { ALLERGEN_OPTIONS, DIET_OPTIONS, LIMIT_OPTIONS, loadProfile, saveProfile, checkConflicts } from "./profile.js";
+import { todayKey, logProduct, removeLogEntry, getEntriesForDate, computeTotals, shiftDateKey, formatDateLabel } from "./log.js";
+import { loadTrip, setTripActive, addToTrip, endTrip, tripTally } from "./trip.js";
+import { Scanner } from "./scanner.js";
+
 (function () {
   const HISTORY_KEY = "shelfcheck_history_v1";
   const MAX_HISTORY = 50;
@@ -529,7 +536,7 @@
   function loadHistory() {
     try {
       return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
-    } catch (e) {
+    } catch {
       return [];
     }
   }
